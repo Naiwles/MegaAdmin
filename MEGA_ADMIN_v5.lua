@@ -11,7 +11,7 @@
 --=  VERSÄ°YON KONTROL â€” GÃœNCELLEME KONTROL
 --â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-local SCRIPT_VERSION = "v5.0"
+local SCRIPT_VERSION = "v5.1"
 local GITHUB_RAW = "https://raw.githubusercontent.com/Naiwles/MegaAdmin/main/MEGA_ADMIN_v5.lua"
 local GITHUB_PAGE = "https://github.com/Naiwles/MegaAdmin"
 
@@ -643,6 +643,7 @@ end
 --â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 local T = {}
+local H = {Boyut=3, Gizli=false, SadeceBaskalari=true}
 local O = {WS=16, JP=50, FS=50, AR=20, AD=5, HS=3, SS=10}
 
 --â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -880,11 +881,57 @@ end)
 
 s4.Kaydirici("Aura Range", 5, 100, 20, function(s) O.AR=s end)
 s4.Kaydirici("Aura Damage", 1, 50, 5, function(s) O.AD=s end)
-s4.Kaydirici("Hitbox Size", 1, 20, 3, function(s)
-    O.HS=s;for _,p in pairs(Players:GetPlayers()) do
-        if p~=LP and p.Character then for _,part in pairs(p.Character:GetDescendants()) do if part:IsA("BasePart") then part.Size=Vector3.new(s,s,s) end end end
+s4.Toggle("Hitbox Visible", "Hitboxlari gorunur yap", function(s) H.Gizli=not s;HitboxGuncelle() end)
+s4.Toggle("Sadece Baskalari", "Kendine hitbox uygulama", function(s) H.SadeceBaskalari=s;HitboxGuncelle() end)
+s4.Kaydirici("Hitbox Boyut", 1, 20, 3, function(s) H.Boyut=s;HitboxGuncelle() end)
+s4.Buton("Hitbox Sifirla", "Herkesin hitboxini normale dondur", function()
+    H.Boyut=3;H.Gizli=false
+    for _,p in pairs(Players:GetPlayers()) do
+        if p.Character then
+            for _,part in pairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Size = (part.Name=="Head") and Vector3.new(2,1,1) or Vector3.new(4,1,2)
+                    part.Transparency=0
+                    pcall(function() part.Material=Enum.Material.Plastic end)
+                end
+            end
+        end
     end
+    Nfy("Hitbox","Sifirlandi")
 end)
+
+-- Hitbox guncelleme fonksiyonu
+local function HitboxGuncelle()
+    for _,p in pairs(Players:GetPlayers()) do
+        if p.Character and (not H.SadeceBaskalari or p~=LP) then
+            for _,part in pairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = H.Gizli and 1 or part.Transparency
+                    -- Boyut uygula (Head farkli boyutlandirma)
+                    if part.Name=="Head" then
+                        part.Size=Vector3.new(H.Boyut*0.5, H.Boyut*0.5, H.Boyut*0.5)
+                    else
+                        part.Size=Vector3.new(H.Boyut, H.Boyut, H.Boyut)
+                    end
+                end
+            end
+        elseif p==LP and H.SadeceBaskalari and p.Character then
+            -- Kendi hitboxini normale dondur
+            for _,part in pairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Size = (part.Name=="Head") and Vector3.new(2,1,1) or Vector3.new(4,1,2)
+                end
+            end
+        end
+    end
+end
+
+-- Aura ve Hitbox icin loop korumasi
+coroutine.wrap(function()
+    while wait(0.5) do
+        if H.Boyut>3 then HitboxGuncelle() end
+    end
+end)()
 
 --â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 --=  TAB 5: ADMIN
