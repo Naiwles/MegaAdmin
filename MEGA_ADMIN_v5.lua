@@ -11,7 +11,7 @@
 --=  VERSÄ°YON KONTROL â€” GÃœNCELLEME KONTROL
 --â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-local SCRIPT_VERSION = "v5.1"
+local SCRIPT_VERSION = "v5.5"
 local GITHUB_RAW = "https://raw.githubusercontent.com/Naiwles/MegaAdmin/main/MEGA_ADMIN_v5.lua"
 local GITHUB_PAGE = "https://github.com/Naiwles/MegaAdmin"
 
@@ -791,28 +791,100 @@ local t2 = NewTab("Visual", "V")
 local s2 = NewSection(t2, "GORSEL")
 
 local ESP_O={}
-s2.Toggle("ESP", "Oyuncular isaretle", function(s)
-    T.ESP=s
+-- ESP icin renk modu ve cesitli ayarlar
+local ESP_Renk = Color3.new(1,0,0) -- Kirmizi
+local ESP_Rainbow = false
+local ESP_Tracer = false
+
+s2.Toggle("ESP", "Oyunculari isaretle (isim+mesafe)", function(s)
+    T.ESP=s;ESP_Temizle()
     if s then
         for _,p in pairs(Players:GetPlayers()) do
-            if p~=LP and p.Character then
-                local hrp=THRP(p);local head=p.Character:FindFirstChild("Head") or hrp
-                if hrp and head then
-                    local hl=Instance.new("Highlight",p.Character);hl.FillColor=C.KIRMIZI;hl.FillTransparency=0.4;table.insert(ESP_O,hl)
-                    local bbg=Instance.new("BillboardGui",p.Character);bbg.Adornee=head;bbg.Size=UDim2.new(0,200,0,50);bbg.StudsOffset=Vector3.new(0,3,0)
-                    local tl=Instance.new("TextLabel",bbg);tl.Size=UDim2.new(1,0,1,0);tl.BackgroundTransparency=1;tl.Text=p.Name;tl.TextStrokeTransparency=0.3;tl.TextColor3=C.TEXT;tl.TextScaled=true;tl.Font=FONT2;table.insert(ESP_O,bbg)
+            if p~=LP and p.Character then ESP_Ekle(p) end
+        end
+        Players.PlayerAdded:Connect(function(p)
+            p.CharacterAdded:Connect(function() wait(1);if T.ESP and p~=LP then ESP_Ekle(p) end end)
+        end)
+        -- Surekli guncelle
+        coroutine.wrap(function()
+            while T.ESP do wait(0.3)
+                if ESP_Rainbow then
+                    ESP_Renk = Color3.fromHSV(tick()%5/5,1,0.8)
+                    for _,p in pairs(Players:GetPlayers()) do
+                        if p~=LP and p.Character then
+                            for _,hl in pairs(p.Character:GetDescendants()) do
+                                if hl:IsA("Highlight") then hl.FillColor=ESP_Renk end
+                            end
+                        end
+                    end
+                end
+                -- Mesafe guncelle
+                for _,p in pairs(Players:GetPlayers()) do
+                    if p~=LP and p.Character then
+                        for _,bbg in pairs(p.Character:GetDescendants()) do
+                            if bbg:IsA("BillboardGui") and bbg:FindFirstChildOfClass("TextLabel") then
+                                local d=(THRP(p) and HRP()) and math.floor((THRP(p).Position-HRP().Position).Magnitude) or 0
+                                bbg.TextLabel.Text=p.Name.." ["..d.."m]"
+                            end
+                        end
+                    end
                 end
             end
-        end
-        coroutine.wrap(function() while T.ESP do wait(0.5)
-            for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then
-                for _,bbg in pairs(p.Character:GetDescendants()) do if bbg:IsA("BillboardGui") and bbg:FindFirstChildOfClass("TextLabel") then
-                    local d=THRP(p) and HRP() and math.floor((THRP(p).Position-HRP().Position).Magnitude) or 0;bbg.TextLabel.Text=p.Name.." ["..d.."m]"
-                end end
-            end end
-        end end)()
-    else
-        for _,o in pairs(ESP_O) do pcall(function() o:Destroy() end) end;ESP_O={}
+        end)()
+        Nfy("ESP","Aktif - Renkli isaretleme")
+    end
+end)
+
+local function ESP_Ekle(p)
+    if not p.Character then return end
+    local hrp=THRP(p);local head=p.Character:FindFirstChild("Head") or hrp
+    if not hrp or not head then return end
+    -- Highlight
+    local hl=Instance.new("Highlight",p.Character)
+    hl.FillColor=ESP_Renk;hl.FillTransparency=0.35;hl.OutlineColor=Color3.new(1,1,1)
+    table.insert(ESP_O,hl)
+    -- Isim etiketi
+    local bbg=Instance.new("BillboardGui",p.Character)
+    bbg.Adornee=head;bbg.Size=UDim2.new(0,200,0,50);bbg.StudsOffset=Vector3.new(0,3,0)
+    local tl=Instance.new("TextLabel",bbg)
+    tl.Size=UDim2.new(1,0,1,0);tl.BackgroundTransparency=1;tl.Text=p.Name
+    tl.TextStrokeTransparency=0.2;tl.TextColor3=ESP_Renk;tl.TextScaled=true;tl.Font=FONT
+    table.insert(ESP_O,bbg)
+    -- Tracer (cizgi)
+    if ESP_Tracer then
+        local line=Drawing.new("Line");line.Visible=true;line.Color=ESP_Renk;line.Thickness=1.5;line.Transparency=0.5
+        table.insert(ESP_O,line)
+        coroutine.wrap(function()
+            while T.ESP and p.Character and hrp do
+                RS.RenderStepped:Wait()
+                local sp,os=Camera:WorldToScreenPoint(hrp.Position)
+                if os then
+                    line.From=Vector2.new(sp.X,sp.Y);line.To=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
+                else line.Visible=false end
+            end
+        end)()
+    end
+end
+
+local function ESP_Temizle()
+    for _,o in pairs(ESP_O) do pcall(function() o:Destroy() end);pcall(function() o.Visible=false end) end
+    ESP_O={}
+end
+
+s2.Toggle("Rainbow ESP", "Surenk degistiren ESP", function(s) ESP_Rainbow=s end)
+s2.Toggle("ESP Tracer", "Oyunculara cizgi ciz (cizgi esp)", function(s)
+    ESP_Tracer=s
+    if T.ESP then
+        ESP_Temizle()
+        for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then ESP_Ekle(p) end end
+    end
+end)
+s2.Dropdown("ESP Rengi", {"Kirmizi","Mavi","Yesil","Sari","Mor","Turuncu","Pembe"}, function(secim)
+    local renkler={Kirmizi=Color3.new(1,0,0),Mavi=Color3.new(0,0.4,1),Yesil=Color3.new(0,1,0),Sari=Color3.new(1,1,0),Mor=Color3.new(0.6,0.2,1),Turuncu=Color3.new(1,0.5,0),Pembe=Color3.new(1,0.4,0.7)}
+    ESP_Renk=renkler[secim] or Color3.new(1,0,0)
+    if T.ESP then
+        ESP_Temizle()
+        for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then ESP_Ekle(p) end end
     end
 end)
 
@@ -823,10 +895,21 @@ s2.Toggle("Full Bright", "Geceyi gunduz yap", function(s)
 end)
 s2.Toggle("X-Ray", "Her sey seffaf", function(s) for _,o in pairs(workspace:GetDescendants()) do if o:IsA("BasePart") then o.Transparency=s and 0.7 or 0 end end end)
 s2.Toggle("Wallhack", "Duvarlar gorunmez", function(s) for _,o in pairs(workspace:GetDescendants()) do if o:IsA("BasePart") and o.Anchored then o.Transparency=s and 0.7 or 0 end end end)
-s2.Toggle("Highlight", "Kirmizi vurgu", function(s)
+s2.Toggle("Highlight", "Vurgu (oyuncu cevresinde isik)", function(s)
+    T.Highlight=s
     for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then
-        if s then local hl=Instance.new("Highlight",p.Character);hl.FillColor=C.KIRMIZI;hl.FillTransparency=0.5
-        else for _,hl in pairs(p.Character:GetDescendants()) do if hl:IsA("Highlight") then hl:Destroy() end end end
+        if s then
+            local hl=Instance.new("Highlight",p.Character);hl.FillColor=C.KIRMIZI;hl.FillTransparency=0.4;hl.OutlineColor=Color3.new(1,1,1)
+            -- Rainbow efekt
+            if s then coroutine.wrap(function()
+                while T.Highlight and hl.Parent do
+                    RS.RenderStepped:Wait()
+                    hl.FillColor=Color3.fromHSV(tick()%3/3,1,0.7)
+                end
+            end)() end
+        else
+            for _,hl in pairs(p.Character:GetDescendants()) do if hl:IsA("Highlight") then hl:Destroy() end end
+        end
     end end
 end)
 
@@ -864,20 +947,93 @@ s3.Buton("Asagi -50", function() if HRP() then HRP().CFrame=HRP().CFrame*CFrame.
 local t4 = NewTab("Combat", "C")
 local s4 = NewSection(t4, "SAVAS")
 
-s4.Toggle("Aimbot", "Otomatik nisan", function(s) T.Aimbot=s end)
-s4.Toggle("Silent Aim", "Vurmus gibi goster (FE)", function(s) SilentAimActive=s end)
-s4.Toggle("Triggerbot", "Hedef nisangalani tikla", function(s)
+-- Aimbot icin Ek ayarlar
+local Aimbot_FOV=90
+local Aimbot_Smooth=0.3
+local Aimbot_WallCheck=false
+
+s4.Toggle("Aimbot", "En yakin oyuncuya otomatik nisan", function(s)
+    T.Aimbot=s
+    if s then Nfy("Aimbot","Aktif - FOV:"..Aimbot_FOV) end
+end)
+
+-- Aimbot Ana Loop (FOV ve Smooth ile)
+coroutine.wrap(function()
+    while wait() do
+        if T.Aimbot then
+            local t=GCP(Aimbot_FOV*3)
+            if t and t.Character and t.Character:FindFirstChild("Head") and THUM(t) and THUM(t).Health>0 then
+                -- Wall check
+                if Aimbot_WallCheck then
+                    local ray=Ray.new(Camera.CFrame.Position, t.Character.Head.Position-Camera.CFrame.Position)
+                    local hit=workspace:FindPartOnRay(ray)
+                    if hit then
+                        local owner=hit:IsDescendantOf(t.Character)
+                        if not owner then return end
+                    end
+                end
+                Camera.CFrame=CFrame.lookAt(Camera.CFrame.Position,t.Character.Head.Position)
+            end
+        end
+    end
+end)()
+
+s4.Kaydirici("Aimbot FOV", 10, 180, 90, function(s) Aimbot_FOV=s end)
+s4.Toggle("Aimbot Wall Check", "Duvardan vurma", function(s) Aimbot_WallCheck=s end)
+
+s4.Toggle("Silent Aim", "Vurmus gibi goster (FE - Metatable Hook)", function(s) SilentAimActive=s end)
+
+-- Triggerbot icin hiz kontrolu
+local Trigger_CPS=10
+s4.Toggle("Triggerbot", "Hedef nisanga gelince otomatik tikla", function(s)
     T.Trig=s
-    if s then coroutine.wrap(function() while T.Trig do RS.RenderStepped:Wait();local tgt=Mouse.Target;if tgt then for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character and tgt:IsDescendantOf(p.Character) then mouse1click();wait(0.05) end end end end end)() end
+    if s then coroutine.wrap(function()
+        while T.Trig do
+            RS.RenderStepped:Wait()
+            local tgt=Mouse.Target
+            if tgt then
+                for _,p in pairs(Players:GetPlayers()) do
+                    if p~=LP and p.Character and tgt:IsDescendantOf(p.Character) then
+                        mouse1click()
+                        wait(0.1/Trigger_CPS)
+                    end
+                end
+            end
+        end
+    end)() end
 end)
-s4.Toggle("Damage Aura", "Yakindakilere hasar ver", function(s)
+s4.Kaydirici("Trigger CPS", 1, 50, 10, function(s) Trigger_CPS=s end)
+
+s4.Toggle("Damage Aura", "Yakindakilere otomatik hasar ver", function(s)
     T.DA=s
-    if s then coroutine.wrap(function() while T.DA do wait(0.3);for _,tg in pairs(GPIR(O.AR)) do local th=THUM(tg);if th and th.Health>0 then th.Health=th.Health-O.AD end end end end)() end
+    if s then coroutine.wrap(function()
+        while T.DA do
+            wait(0.25)
+            local say=0
+            for _,tg in pairs(GPIR(O.AR)) do
+                local th=THUM(tg)
+                if th and th.Health>0 then
+                    th.Health=th.Health-O.AD
+                    say=say+1
+                end
+            end
+            if say>0 then Nfy("Aura",say.." oyuncuya hasar verildi") end
+        end
+    end)() end
 end)
+
+-- Auto Click icin CPS kontrolu
+local AutoClick_CPS=15
 s4.Toggle("Auto Click", "Surekli otomatik tikla", function(s)
     T.AC=s
-    if s then coroutine.wrap(function() while T.AC do mouse1click();wait(0.05) end end)() end
+    if s then coroutine.wrap(function()
+        while T.AC do
+            mouse1click()
+            wait(0.1/AutoClick_CPS)
+        end
+    end)() end
 end)
+s4.Kaydirici("Auto Click CPS", 1, 100, 15, function(s) AutoClick_CPS=s end)
 
 s4.Kaydirici("Aura Range", 5, 100, 20, function(s) O.AR=s end)
 s4.Kaydirici("Aura Damage", 1, 50, 5, function(s) O.AD=s end)
@@ -940,6 +1096,8 @@ end)()
 local t5 = NewTab("Admin", "A")
 local s5 = NewSection(t5, "FE YONETICI")
 
+local FE_IslemSayisi=0
+
 local function FKick(t)
     if not t then return end
     local c=t.Character
@@ -947,13 +1105,50 @@ local function FKick(t)
         local h=c:FindFirstChildOfClass("Humanoid")
         if h then h.Health=0;h:BreakJoints() end;c:BreakJoints()
     end
-    for _,r in pairs(game:GetDescendants()) do if r:IsA("RemoteEvent") and r.Name:lower():find("kick") then pcall(function() r:FireServer(t) end) end end
+    -- Remote event bulup kick dene
+    for _,r in pairs(game:GetDescendants()) do
+        if r:IsA("RemoteEvent") and (r.Name:lower():find("kick") or r.Name:lower():find("ban") or r.Name:lower():find("removeplayer")) then
+            pcall(function() r:FireServer(t) end)
+        end
+    end
+    FE_IslemSayisi=FE_IslemSayisi+1
 end
 
 local function FKill(t)
     if not t or not t.Character then return end
     local h=t.Character:FindFirstChildOfClass("Humanoid")
-    if h then h.Health=0;h:BreakJoints() end
+    if h then
+        h.Health=0
+        h:BreakJoints()
+        -- Tum eklemleri kir
+        for _,eklem in pairs(t.Character:GetDescendants()) do
+            if eklem:IsA("JointInstance") then eklem:Destroy() end
+        end
+    end
+    FE_IslemSayisi=FE_IslemSayisi+1
+end
+
+local function FJail(t, boyut)
+    if not t or not THRP(t) then return end
+    local pos=THRP(t).Position
+    local b=boyut or 5
+    -- Hapishane hucresi olustur
+    for dx=-b,b,2 do
+        for dz=-b,b,2 do
+            if math.abs(dx)<=b-1 or math.abs(dz)<=b-1 then
+                local p=Instance.new("Part");p.Size=Vector3.new(2,1,2);p.Position=pos+Vector3.new(dx,0,dz)
+                p.Anchored=true;p.BrickColor=BrickColor.new("Bright red");p.Material=Enum.Material.SmoothPlastic;p.Parent=workspace;Debris:AddItem(p,120)
+            end
+        end
+    end
+    -- Tavan
+    local tavan=Instance.new("Part");tavan.Size=Vector3.new(b*2+2,1,b*2+2);tavan.Position=pos+Vector3.new(0,8,0)
+    tavan.Anchored=true;tavan.BrickColor=BrickColor.new("Bright red");tavan.Material=Enum.Material.Neon;tavan.Parent=workspace;Debris:AddItem(tavan,120)
+    -- Taban
+    local taban=Instance.new("Part");taban.Size=Vector3.new(b*2+2,1,b*2+2);taban.Position=pos+Vector3.new(0,-3,0)
+    taban.Anchored=true;taban.BrickColor=BrickColor.new("Dark stone grey");taban.Parent=workspace;Debris:AddItem(taban,120)
+    -- Ozel efekt: isiklandirma
+    local spot=Instance.new("SpotLight",tavan);spot.Brightness=2;spot.Range=15;spot.Angle=180;spot.Color=Color3.new(1,0,0)
 end
 
 -- Oyuncu seÃ§meli kick/kill
