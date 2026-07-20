@@ -871,8 +871,73 @@ local function ESP_Temizle()
     ESP_O={}
 end
 
+-- Skeleton ESP
+local function ESP_Skeleton(p)
+    if not p.Character then return end
+    local bas=p.Character:FindFirstChild("Head")
+    local g=p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
+    local sk=p.Character:FindFirstChild("LeftArm") or p.Character:FindFirstChild("LeftUpperArm")
+    local sk2=p.Character:FindFirstChild("RightArm") or p.Character:FindFirstChild("RightUpperArm")
+    local sb=p.Character:FindFirstChild("LeftLeg") or p.Character:FindFirstChild("LeftUpperLeg")
+    local sb2=p.Character:FindFirstChild("RightLeg") or p.Character:FindFirstChild("RightUpperLeg")
+    local baglanti={{bas,g},{g,sk},{g,sk2},{g,sb},{g,sb2}}
+    for _,b in pairs(baglanti) do
+        local p1,p2=b[1],b[2]
+        if p1 and p2 then
+            local c=Drawing.new("Line");c.Visible=true;c.Color=ESP_Renk;c.Thickness=1.5;table.insert(ESP_O,c)
+            coroutine.wrap(function()
+                while T.ESP and p1.Parent and p2.Parent do
+                    RS.RenderStepped:Wait()
+                    local s1,o1=Camera:WorldToScreenPoint(p1.Position)
+                    local s2,o2=Camera:WorldToScreenPoint(p2.Position)
+                    if o1 and o2 then c.From=Vector2.new(s1.X,s1.Y);c.To=Vector2.new(s2.X,s2.Y);c.Visible=true
+                    else c.Visible=false end
+                end
+            end)()
+        end
+    end
+end
+
+-- Box ESP
+local function ESP_Box(p)
+    local hrp=THRP(p)
+    if hrp then
+        local bx=Instance.new("SelectionBox");bx.Adornee=hrp;bx.LineThickness=0.1;bx.Color3=ESP_Renk;bx.Parent=p.Character;table.insert(ESP_O,bx)
+    end
+end
+
+-- Health Bar ESP
+local function ESP_CanBar(p)
+    local hrp=THRP(p);local head=p.Character:FindFirstChild("Head") or hrp
+    if head then
+        local bbg=Instance.new("BillboardGui");bbg.Adornee=head;bbg.Size=UDim2.new(0,30,0,4);bbg.StudsOffset=Vector3.new(0,2.5,0);bbg.Parent=p.Character
+        local arka=Instance.new("Frame",bbg);arka.Size=UDim2.new(1,0,1,0);arka.BackgroundColor3=Color3.new(0.3,0,0);arka.BorderSizePixel=0
+        local dolgu=Instance.new("Frame",bbg);dolgu.Size=UDim2.new(1,0,1,0);dolgu.BackgroundColor3=Color3.new(0,1,0);dolgu.BorderSizePixel=0
+        table.insert(ESP_O,bbg)
+        coroutine.wrap(function()
+            while T.ESP and p.Character and THUM(p) do wait(0.3)
+                local h=THUM(p);if h and h.MaxHealth>0 then dolgu.Size=UDim2.new(math.clamp(h.Health/h.MaxHealth,0,1),0,1,0) end
+            end
+        end)()
+    end
+end
+
+-- ESP_Ekle fonksiyonuna skeleton/box/healthbar ekle
+local ESP_Ekle_old=ESP_Ekle
+local function ESP_Ekle(p)
+    ESP_Ekle_old(p)
+    if ESP_Skeleton then ESP_Skeleton(p) end
+    if ESP_Box then ESP_Box(p) end
+    if ESP_HealthBar then ESP_CanBar(p) end
+end
+
+-- ESP ayarlari
+s2.Toggle("ESP Skeleton", "Oyuncu iskeletini ciz", function(s) ESP_Skeleton=s;if T.ESP then ESP_Temizle();for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then ESP_Ekle(p) end end end end)
+s2.Toggle("ESP Box", "2D kutu ESP", function(s) ESP_Box=s;if T.ESP then ESP_Temizle();for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then ESP_Ekle(p) end end end end)
+s2.Toggle("ESP Health Bar", "Can bar goster", function(s) ESP_HealthBar=s;if T.ESP then ESP_Temizle();for _,p in pairs(Players:GetPlayers()) do if p~=LP and p.Character then ESP_Ekle(p) end end end end)
+
 s2.Toggle("Rainbow ESP", "Surenk degistiren ESP", function(s) ESP_Rainbow=s end)
-s2.Toggle("ESP Tracer", "Oyunculara cizgi ciz (cizgi esp)", function(s)
+s2.Toggle("ESP Tracer", "Oyunculara cizgi ciz", function(s)
     ESP_Tracer=s
     if T.ESP then
         ESP_Temizle()
@@ -952,6 +1017,40 @@ local Aimbot_FOV=90
 local Aimbot_Smooth=0.3
 local Aimbot_WallCheck=false
 
+-- FOV Circle
+local FOV_Circle_Active=false
+local FOV_Circle=Drawing.new("Circle")
+FOV_Circle.Thickness=1;FOV_Circle.NumSides=48;FOV_Circle.Filled=false
+FOV_Circle.Color=Color3.new(1,1,1);FOV_Circle.Transparency=0.7;FOV_Circle.Visible=false
+
+coroutine.wrap(function()
+    while wait() do
+        if FOV_Circle_Active and Camera then
+            FOV_Circle.Visible=true;FOV_Circle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2);FOV_Circle.Radius=Aimbot_FOV
+        else FOV_Circle.Visible=false end
+    end
+end)()
+
+-- Crosshair
+local Crosshair_Active=false
+local CH={renk=Color3.new(0,1,0),kalinlik=1.5,uzunluk=8,bosluk=3}
+local CHC={}
+for i=1,4 do CHC[i]=Drawing.new("Line") end
+
+coroutine.wrap(function()
+    while wait() do
+        if Crosshair_Active and Camera then
+            local cx,cy=Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2
+            local u,b=CH.uzunluk,CH.bosluk
+            CHC[1].From=Vector2.new(cx,cy-b);CHC[1].To=Vector2.new(cx,cy-b-u)
+            CHC[2].From=Vector2.new(cx,cy+b);CHC[2].To=Vector2.new(cx,cy+b+u)
+            CHC[3].From=Vector2.new(cx-b,cy);CHC[3].To=Vector2.new(cx-b-u,cy)
+            CHC[4].From=Vector2.new(cx+b,cy);CHC[4].To=Vector2.new(cx+b+u,cy)
+            for _,l in pairs(CHC) do l.Visible=true;l.Color=CH.renk;l.Thickness=CH.kalinlik end
+        else for _,l in pairs(CHC) do l.Visible=false end end
+    end
+end)()
+
 s4.Toggle("Aimbot", "En yakin oyuncuya otomatik nisan", function(s)
     T.Aimbot=s
     if s then Nfy("Aimbot","Aktif - FOV:"..Aimbot_FOV) end
@@ -979,6 +1078,10 @@ coroutine.wrap(function()
 end)()
 
 s4.Kaydirici("Aimbot FOV", 10, 180, 90, function(s) Aimbot_FOV=s end)
+s4.Toggle("FOV Circle", "Aimbot menzilini gosteren daire", function(s)
+    FOV_Circle_Active=s
+    if s then FOV_Circle.Visible=true else FOV_Circle.Visible=false end
+end)
 s4.Toggle("Aimbot Wall Check", "Duvardan vurma", function(s) Aimbot_WallCheck=s end)
 
 s4.Toggle("Silent Aim", "Vurmus gibi goster (FE - Metatable Hook)", function(s) SilentAimActive=s end)
@@ -1233,7 +1336,11 @@ s7.Yazi("R = Reset Character")
 
 local s7b = NewSection(t7, "VERSIYON & GUNCELLEME")
 s7b.Yazi("MEGA ADMIN "..SCRIPT_VERSION.." â€” THOREL EDITION")
-s7b.Yazi("Guncel surum kontrolu aktif")
+s7b.Yazi("ESP: Skeleton, Box, Health Bar, Tracer, Rainbow")
+s7b.Yazi("Combat: Aimbot, FOV Circle, Silent Aim, Trigger, Aura")
+s7b.Yazi("Hitbox: Size, Visible, Self Exclusion")
+s7b.Yazi("Crosshair: Custom renk/boyut/kalinlik/bosluk")
+s7b.Yazi("Waypoint: 2 konum kaydetme")
 s7b.Yazi("")
 s7b.Yazi("Github: " .. GITHUB_PAGE)
 
